@@ -1,7 +1,7 @@
 SRCS := $(shell find . -name "*.cu")
 OBJS := $(SRCS:%.cu=%.o) # substitution reference
 CC=nvcc
-CFLAGS=-std=c++17 -rdc=true
+CFLAGS=-rdc=true
 BIN = main
 EXT = cu
 
@@ -19,7 +19,7 @@ main_debug: $(SRCS)
 	$(CC) -c -o $@ $< $(CFLAGS)
 
 clean:
-	rm -f *.o $(BIN)
+	rm -f *.o $(BIN) main_debug
 
 .PHONY: clean test main_debug
 .SILENT: test

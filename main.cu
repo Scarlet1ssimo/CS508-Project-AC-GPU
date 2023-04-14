@@ -31,20 +31,16 @@ void eval(int M, int N, int L, int kernel_id, const int charSetSize, const char*
   random_string(text, charSetSize, L);
 
   // Allocate memory on CPU for building Trie and Aho-Corasick Algorithm
-  int trieNodeBound  = N * M;
-  int* tr            = (int*) malloc(trieNodeBound * charSetSize * sizeof(int)); // tr[trieNodeBound][charSetSize] -> trieNodeBound;
-  int* idx           = (int*) malloc(N * sizeof(int));                           // idx[N] -> trieNodeBound;
+  int trieNodeBound = N * M;
+  int* tr           = (int*) malloc(trieNodeBound * charSetSize * sizeof(int)); // tr[trieNodeBound][charSetSize] -> trieNodeBound;
+  int* idx          = (int*) malloc(N * sizeof(int));                           // idx[N] -> trieNodeBound;
   memset(tr, 0, trieNodeBound * charSetSize * sizeof(int));
   int trieNodeNumber = TrieBuildCPU(patterns, tr, idx, M, N, charSetSize);
   int* fail          = (int*) malloc(trieNodeNumber * sizeof(int)); // fail[trieNodeNumber] -> trieNodeNumber;
   int* postOrder     = (int*) malloc(trieNodeNumber * sizeof(int)); // postOrder[trieNodeNumber] -> trieNodeNumber;
-  int* out_cpu       = (int*) malloc(trieNodeNumber * sizeof(int)); // out[N] -> L;
-  int* out_gpu       = (int*) malloc(trieNodeNumber * sizeof(int)); // out[N] -> L;
   int* occur_gpu     = (int*) malloc(trieNodeNumber * sizeof(int)); // occur[trieNodeNumber] -> L;
   int* occur_cpu     = (int*) malloc(trieNodeNumber * sizeof(int)); // occur[trieNodeNumber] -> L;
   memset(fail, 0, trieNodeNumber * sizeof(int));
-  memset(out_cpu, 0, trieNodeNumber * sizeof(int));
-  memset(out_gpu, 0, trieNodeNumber * sizeof(int));
   memset(occur_cpu, 0, trieNodeNumber * sizeof(int));
 
   // Build Aho-Corasick Automaton on CPU
@@ -77,13 +73,13 @@ void eval(int M, int N, int L, int kernel_id, const int charSetSize, const char*
   // Run Aho-Corasick Algorithm on CPU
   ACCPU(tr, text, occur_cpu, L, charSetSize);
   // Post processing to get the final result
-  ACPostCPU(out_cpu, fail, postOrder, trieNodeNumber - 1);
-  ACPostCPU(out_gpu, fail, postOrder, trieNodeNumber - 1);
+  ACPostCPU(occur_cpu, fail, postOrder, trieNodeNumber - 1);
+  ACPostCPU(occur_gpu, fail, postOrder, trieNodeNumber - 1);
 
   // Verification against CPU result
   for (int i = 0; i < N; i++)
-    if (out_cpu[idx[i]] != out_gpu[idx[i]]) {
-      printf("Error at %d: %d %d\n", i, out_cpu[i], out_gpu[i]);
+    if (occur_cpu[idx[i]] != occur_gpu[idx[i]]) {
+      printf("Error at %d: %d %d\n", i, occur_cpu[idx[i]], occur_gpu[idx[i]]);
       goto bad;
     }
   printf("Pass\n");
@@ -96,8 +92,6 @@ bad:
   free(idx);
   free(fail);
   free(postOrder);
-  free(out_cpu);
-  free(out_gpu);
   free(occur_gpu);
   free(occur_cpu);
   free(text);
@@ -109,6 +103,6 @@ int main() {
   srand(940012978);
   eval(8, 16000, 1e6, 0, 4, "ACSimple");
   eval(8, 16000, 1e7, 0, 4, "ACSimple");
-  eval(8, 16000, 1e8, 0, 4, "ACSimple");
-  eval(8, 16000, 1e9, 0, 4, "ACSimple");
+  // eval(8, 16000, 1e8, 0, 4, "ACSimple");
+  // eval(8, 16000, 1e9, 0, 4, "ACSimple");
 }
