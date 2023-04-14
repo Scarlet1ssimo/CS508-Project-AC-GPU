@@ -1,3 +1,4 @@
+#include <cassert>
 #include <queue>
 using std::queue;
 void random_string(char* dst, const int charSetSize, const int len) {
@@ -18,6 +19,36 @@ int TrieBuildCPU(char* const* patterns, int* tr, int* idx, const int M, const in
     idx[i] = state;
   }
   return trieNodeNumber;
+}
+void TrieReorder(int* tr, int* idx, const int N, const int trieNodeNumber, const int charSetSize) {
+  // Reorder the trie by BFS order
+  int* newTr   = (int*) malloc(sizeof(int) * trieNodeNumber * charSetSize);
+  int* old2New = (int*) malloc(sizeof(int) * trieNodeNumber);
+  queue<int> q;
+  q.push(0);
+  int cnt = 0;
+  while (!q.empty()) {
+    int u = q.front();
+    q.pop();
+    old2New[u] = cnt++;
+    for (int i = 0; i < charSetSize; i++)
+      if (auto v = tr[u * charSetSize + i])
+        q.push(v);
+  }
+  assert(cnt == trieNodeNumber);
+  for (int i = 0; i < trieNodeNumber; i++)
+    for (int j = 0; j < charSetSize; j++) {
+      assert(old2New[tr[i * charSetSize + j]] < trieNodeNumber);
+      assert(tr[i * charSetSize + j] < trieNodeNumber);
+      assert(old2New[i] < trieNodeNumber);
+      assert(i < trieNodeNumber);
+      newTr[old2New[i] * charSetSize + j] = old2New[tr[i * charSetSize + j]];
+    }
+  for (int i = 0; i < N; i++)
+    idx[i] = old2New[idx[i]];
+  memcpy(tr, newTr, sizeof(int) * trieNodeNumber * charSetSize);
+  free(newTr);
+  free(old2New);
 }
 void ACBuildCPU(int* tr, int* fail, int* postOrder, const int charSetSize) {
   queue<int> q;

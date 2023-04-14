@@ -1,6 +1,10 @@
 #include "ac_cpu.h"
-#include "kernel.hu"
+#include "kernel.h"
+#include "utility.h"
 #include <cstdio>
+#include <cstdlib>
+#include <map>
+using std::map;
 
 #define CUDA_RUNTIME(stmt) checkCuda(stmt, __FILE__, __LINE__);
 void checkCuda(cudaError_t result, const char* file, const int line) {
@@ -9,59 +13,36 @@ void checkCuda(cudaError_t result, const char* file, const int line) {
     exit(-1);
   }
 }
-#define RED "\x1B[31m"
-#define GREEN "\x1B[32m"
-#define INFO "\x1B[34m"
-#define YELLOW "\x1B[33m"
-#define NORMAL "\033[0m"
-struct Timer {
-  cudaEvent_t start, stop;
-  Timer() {
-    cudaEventCreate(&start);
-    cudaEventCreate(&stop);
-  }
-  ~Timer() {
-    cudaEventDestroy(start);
-    cudaEventDestroy(stop);
-  }
-  void Start() {
-    cudaEventRecord(start, 0);
-  }
-  void Stop() {
-    cudaEventRecord(stop, 0);
-  }
-  void StartAndPrint(const char* msg) {
-    printf("%s...", msg);
-    Start();
-  }
-  void StopAndPrint() {
-    Stop();
-    printf(" %f ms\n" NORMAL, elapsed());
-  }
-  float elapsed() {
-    float time;
-    cudaEventSynchronize(stop);
-    cudaEventElapsedTime(&time, start, stop);
-    return time;
-  }
+Timer timer;
+enum KernelAvailable {
+  KERNEL_SIMPLE,
+  KERNEL_SHARED_MEM,
 };
+std::map<KernelAvailable, const char*> kernelName = {
+    {KERNEL_SIMPLE, "KERNEL_SIMPLE"},
+    {KERNEL_SHARED_MEM, "KERNEL_SHARED_MEM"},
+};
+struct AdditionalTestConfig {
+  bool ReorderTrie;
+  unsigned int randomSeed;
+};
+
 // M: pattern length (like 8 for pattern "ACGTACGT")
 // N: number of all patterns, typically 16000
 // L: text length, typically 1e6
 // Charset (4 for ACGT)
 // Kernel version
-Timer timer;
-#define TIMER_START(msg) timer.StartAndPrint(msg)
-#define TIMER_STOP() timer.StopAndPrint()
-#define SET_COLOR(color) printf(color)
-
-void eval(int M, int N, int L, int kernel_id, const int charSetSize, const char* testName) {
-  // TODO: Prettify the output
-  // At least output the run time
-
+void eval(int M, int N, int L, KernelAvailable kernel_id, const int charSetSize, const char* testName, AdditionalTestConfig config) {
   // Generate random patterns and text
   printf("====================================\n");
-  printf(YELLOW "Start testing %s: (M=%d, N=%d, L=%d)\n" NORMAL, testName, M, N, L);
+  printf("Start testing " YELLOW "%s" NORMAL ": " INFO "(pattern length = %d, %d patterns, text length = %d, |CharSet|=%d)\n" NORMAL,
+         testName, M, N, L, charSetSize);
+  printf("Using kernel: " YELLOW "%s\n" NORMAL, kernelName[kernel_id]);
+  if (config.randomSeed != 0) {
+    printf(ADDITIONAL "Using random seed = %u\n" NORMAL, config.randomSeed);
+    srand(config.randomSeed);
+  }
+
   char** patterns = (char**) malloc(N * sizeof(char*));
   for (int i = 0; i < N; i++) {
     patterns[i] = (char*) malloc((M + 1) * sizeof(char));
@@ -77,10 +58,14 @@ void eval(int M, int N, int L, int kernel_id, const int charSetSize, const char*
   int* idx          = (int*) malloc(N * sizeof(int));                           // idx[N] -> trieNodeBound;
   memset(tr, 0, trieNodeBound * charSetSize * sizeof(int));
   int trieNodeNumber = TrieBuildCPU(patterns, tr, idx, M, N, charSetSize);
-  int* fail          = (int*) malloc(trieNodeNumber * sizeof(int)); // fail[trieNodeNumber] -> trieNodeNumber;
-  int* postOrder     = (int*) malloc(trieNodeNumber * sizeof(int)); // postOrder[trieNodeNumber] -> trieNodeNumber;
-  int* occur_gpu     = (int*) malloc(trieNodeNumber * sizeof(int)); // occur[trieNodeNumber] -> L;
-  int* occur_cpu     = (int*) malloc(trieNodeNumber * sizeof(int)); // occur[trieNodeNumber] -> L;
+  if (config.ReorderTrie) {
+    printf(ADDITIONAL "\nReordering Trie...");
+    TrieReorder(tr, idx, N, trieNodeNumber, charSetSize);
+  }
+  int* fail      = (int*) malloc(trieNodeNumber * sizeof(int)); // fail[trieNodeNumber] -> trieNodeNumber;
+  int* postOrder = (int*) malloc(trieNodeNumber * sizeof(int)); // postOrder[trieNodeNumber] -> trieNodeNumber;
+  int* occur_gpu = (int*) malloc(trieNodeNumber * sizeof(int)); // occur[trieNodeNumber] -> L;
+  int* occur_cpu = (int*) malloc(trieNodeNumber * sizeof(int)); // occur[trieNodeNumber] -> L;
   memset(fail, 0, trieNodeNumber * sizeof(int));
   memset(occur_cpu, 0, trieNodeNumber * sizeof(int));
 
@@ -103,9 +88,9 @@ void eval(int M, int N, int L, int kernel_id, const int charSetSize, const char*
   // Run Aho-Corasick Algorithm on GPU
   TIMER_START(INFO "Running Aho-Corasick Algorithm on GPU");
   SET_COLOR(YELLOW);
-  if (kernel_id == 0)
+  if (kernel_id == KERNEL_SIMPLE)
     ACGPUSimpleLaunch(d_tr, d_text, d_occur, M, L, charSetSize);
-  else if (kernel_id == 1) {
+  else if (kernel_id == KERNEL_SHARED_MEM) {
     ACGPUSharedMemLaunch(d_tr, d_text, d_occur, M, L, charSetSize, trieNodeNumber);
   } else {
     printf(RED "Error: kernel_id = %d is not supported", kernel_id);
@@ -159,12 +144,13 @@ bad:
   free(patterns);
 }
 int main() {
-  srand(940012978);
+  srand(time(NULL));
   // eval(8, 16000, 1e6, 0, 4, "ACSimple");
   // eval(8, 16000, 1e7, 0, 4, "ACSimple");
-  eval(8, 16000, 1e8, 0, 4, "ACSimple");
+  eval(8, 16000, 1e8, KERNEL_SIMPLE, 4, "ACSimple", {.randomSeed = 23333});
   // eval(8, 16000, 1e8, 1, 4, "ACSharedMem");
   // eval(8, 160, 1e8, 0, 4, "ACSimple");
-  eval(8, 16000, 1e8, 1, 4, "ACSharedMem");
+  eval(8, 16000, 1e8, KERNEL_SHARED_MEM, 4, "ACSharedMem", {.randomSeed = 23333});
+  eval(8, 16000, 1e8, KERNEL_SHARED_MEM, 4, "ACSharedMemWithReordering", {.ReorderTrie = true, .randomSeed = 23333});
   // eval(8, 16000, 1e9, 0, 4, "ACSimple");
 }
