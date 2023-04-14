@@ -23,8 +23,8 @@ std::map<KernelAvailable, const char*> kernelName = {
     {KERNEL_SHARED_MEM, "KERNEL_SHARED_MEM"},
 };
 struct AdditionalTestConfig {
-  bool ReorderTrie;
   unsigned int randomSeed;
+  bool ReorderTrie;
 };
 
 // M: pattern length (like 8 for pattern "ACGTACGT")
@@ -147,10 +147,10 @@ int main() {
   srand(time(NULL));
   // eval(8, 16000, 1e6, 0, 4, "ACSimple");
   // eval(8, 16000, 1e7, 0, 4, "ACSimple");
-  eval(8, 16000, 1e8, KERNEL_SIMPLE, 4, "ACSimple", {.randomSeed = 23333});
+  eval(8, 16000, 1e8, KERNEL_SIMPLE, 4, "ACSimple", {23333, false});
   // eval(8, 16000, 1e8, 1, 4, "ACSharedMem");
   // eval(8, 160, 1e8, 0, 4, "ACSimple");
-  eval(8, 16000, 1e8, KERNEL_SHARED_MEM, 4, "ACSharedMem", {.randomSeed = 23333});
-  eval(8, 16000, 1e8, KERNEL_SHARED_MEM, 4, "ACSharedMemWithReordering", {.ReorderTrie = true, .randomSeed = 23333});
+  eval(8, 16000, 1e8, KERNEL_SHARED_MEM, 4, "ACSharedMem", {23333, false});
+  eval(8, 16000, 1e8, KERNEL_SHARED_MEM, 4, "ACSharedMemWithReordering", {23333, true});
   // eval(8, 16000, 1e9, 0, 4, "ACSimple");
 }

@@ -19,7 +19,7 @@ void ACGPUSimpleLaunch(const int* tr, const char* text, int* occur, const int M,
   int blockNum = (L - 1) / (BLOCK_SIZE * TILE_SIZE) + 1;
   ACGPUSimple<<<blockNum, BLOCK_SIZE>>>(tr, text, occur, M, L, charSetSize);
 }
-const int GPUbinSize = 8192;
+const int GPUbinSize = 2048;
 
 __global__ void ACGPUSharedMem(const int* tr, const char* text, int* occur, const int M, const int L, const int charSetSize,
                                const int trieNodeNumber) {
