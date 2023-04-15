@@ -17,10 +17,12 @@ Timer timer;
 enum KernelAvailable {
   KERNEL_SIMPLE,
   KERNEL_SHARED_MEM,
+  KERNEL_COALESCED_MEM_READ,
 };
 std::map<KernelAvailable, const char*> kernelName = {
     {KERNEL_SIMPLE, "KERNEL_SIMPLE"},
     {KERNEL_SHARED_MEM, "KERNEL_SHARED_MEM"},
+    {KERNEL_COALESCED_MEM_READ, "KERNEL_COALESCED_MEM_READ"},
 };
 struct AdditionalTestConfig {
   unsigned int randomSeed;
@@ -90,9 +92,11 @@ void eval(int M, int N, int L, KernelAvailable kernel_id, const int charSetSize,
   SET_COLOR(YELLOW);
   if (kernel_id == KERNEL_SIMPLE)
     ACGPUSimpleLaunch(d_tr, d_text, d_occur, M, L, charSetSize);
-  else if (kernel_id == KERNEL_SHARED_MEM) {
+  else if (kernel_id == KERNEL_SHARED_MEM)
     ACGPUSharedMemLaunch(d_tr, d_text, d_occur, M, L, charSetSize, trieNodeNumber);
-  } else {
+  else if (kernel_id == KERNEL_COALESCED_MEM_READ)
+    ACGPUCoalecedMemReadLaunch(d_tr, d_text, d_occur, M, L, charSetSize);
+  else {
     printf(RED "Error: kernel_id = %d is not supported", kernel_id);
     TIMER_STOP();
     // goto bad;
@@ -148,6 +152,7 @@ int main() {
   // eval(8, 16000, 1e6, 0, 4, "ACSimple");
   // eval(8, 16000, 1e7, 0, 4, "ACSimple");
   eval(8, 16000, 1e8, KERNEL_SIMPLE, 4, "ACSimple", {23333, false});
+  eval(8, 16000, 1e8, KERNEL_COALESCED_MEM_READ, 4, "ACCoalecedMemRead", {23333, false});
   // eval(8, 16000, 1e8, 1, 4, "ACSharedMem");
   // eval(8, 160, 1e8, 0, 4, "ACSimple");
   eval(8, 16000, 1e8, KERNEL_SHARED_MEM, 4, "ACSharedMem", {23333, false});
