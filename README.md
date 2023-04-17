@@ -2,14 +2,14 @@
 
 ### Overview of current status
 
-Finished sequential CPU version and GPU baseline version. \
+Finished sequential CPU version and GPU baseline version, as well as the optimization 1 and 2. \
 Issues we've encountered: Not many optimization options for now \
-Next-week Plan: Implement the optimization 1 and 2. Test the performance. Come up with new optimization methods.
+Next-week Plan: Test the performance. Come up with new optimization methods.
 
 
 ### Problem description:
 
-It's a multi-pattern string matching problem. Let `CharSet` be character set, with `charSetSize` different characters. There are `N` patterns, each with length of `M`, and `text`, a long string with length of `L`. We need to find the number of occurrences of all patterns in side `text`.
+It's a multi-pattern string matching problem. Let `CharSet` be character set, with `charSetSize` different characters. There are `N` patterns, each with length of `M`, and `text`, a long string with length of `L`. We need to find the number of occurrences of all patterns inside `text`.
 
 For example:
 
@@ -30,6 +30,14 @@ occur[0]=3;
 occur[1]=2;
 occur[2]=0;
 occur[3]=2;
+```
+
+In our problem setting:
+```
+L=1e8;
+M=8;
+N=16000;
+charSetSize=4;
 ```
 
 ## CPU:
