@@ -1,5 +1,12 @@
 # Aho-Corasick Algorithm on GPU
 
+### Overview of current status
+
+Finished sequential CPU version and GPU baseline version. \
+Issues we've encountered: Not many optimization options for now \
+Next-week Plan: Implement the optimization 1 and 2. Test the performance. Come up with new optimization methods.
+
+
 ### Problem description:
 
 It's a multi-pattern string matching problem. Let `CharSet` be character set, with `charSetSize` different characters. There are `N` patterns, each with length of `M`, and `text`, a long string with length of `L`. We need to find the number of occurrences of all patterns in side `text`.
