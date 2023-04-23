@@ -1,4 +1,5 @@
 SRCS := $(shell find . -name "*.cu")
+HEADERS := $(shell find . -name "*.h")
 OBJS := $(SRCS:%.cu=%.o) # substitution reference
 CC=nvcc
 CFLAGS=-rdc=true
@@ -15,7 +16,7 @@ gdb: main_debug
 main_debug: $(SRCS)
 	$(CC) -o main_debug $^ -g
 
-%.o: %.cu
+%.o: %.cu $(HEADERS)
 	$(CC) -c -o $@ $< $(CFLAGS)
 
 clean:

@@ -94,11 +94,11 @@ void eval(int M, int N, int L, KernelAvailable kernel_id, const char* testName, 
   TIMER_START(INFO "Running Aho-Corasick Algorithm on GPU");
   SET_COLOR(YELLOW);
   if (kernel_id == KERNEL_SIMPLE)
-    ACGPUSimpleLaunch(d_tr, d_text, d_occur, M, L, charSetSize);
+    ACGPUSimpleLaunch<charSetSize>(d_tr, d_text, d_occur, M, L);
   else if (kernel_id == KERNEL_SHARED_MEM)
-    ACGPUSharedMemLaunch(d_tr, d_text, d_occur, M, L, charSetSize, trieNodeNumber);
+    ACGPUSharedMemLaunch<charSetSize>(d_tr, d_text, d_occur, M, L, trieNodeNumber);
   else if (kernel_id == KERNEL_COALESCED_MEM_READ)
-    ACGPUCoalecedMemReadLaunch(d_tr, d_text, d_occur, M, L, charSetSize);
+    ACGPUCoalecedMemReadLaunch<charSetSize>(d_tr, d_text, d_occur, M, L);
   else if (kernel_id == KERNEL_COMPACT_MEM)
     ACGPUCompactMemLaunch<charSetSize>(d_tr, d_text, d_occur, M, L);
   else {
@@ -163,4 +163,6 @@ int main() {
   eval<4>(8, 16000, 1e8, KERNEL_SHARED_MEM, "ACSharedMem", {23333, false});
   eval<4>(8, 16000, 1e8, KERNEL_SHARED_MEM, "ACSharedMemWithReordering", {23333, true});
   // eval<4>(8, 16000, 1e9, 0, "ACSimple");
+
+  eval<4>(8, 16000, 1e8, KERNEL_COMPACT_MEM, "ACCompactMem", {23333, true});
 }
