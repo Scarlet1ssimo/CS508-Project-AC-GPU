@@ -59,9 +59,9 @@ void ACGPUCompactMemLaunch(const int* tr, const char* text, int* occur, int M, i
   
   T* d_text_compact;
   cudaMalloc(&d_text_compact, (L + 1) * sizeof(T));
-  TIMER_START("CompactMem");
+  // TIMER_START("CompactMem");
   CompactText<<<ceil(L * 1.0 / (BLOCK_SIZE * numElement)), BLOCK_SIZE>>>(text, d_text_compact, L);
   cudaDeviceSynchronize();
-  TIMER_STOP();
+  // TIMER_STOP();
   ACGPUCompactMem<charSetSize, TILE_SIZE><<<ceil(L * 1.0 / (BLOCK_SIZE * TILE_SIZE * numElement)), BLOCK_SIZE>>>(tr, d_text_compact, occur, M, L);
 }
