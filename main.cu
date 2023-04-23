@@ -18,11 +18,13 @@ enum KernelAvailable {
   KERNEL_SIMPLE,
   KERNEL_SHARED_MEM,
   KERNEL_COALESCED_MEM_READ,
+  KERNEL_COMPACT_MEM,
 };
 std::map<KernelAvailable, const char*> kernelName = {
     {KERNEL_SIMPLE, "KERNEL_SIMPLE"},
     {KERNEL_SHARED_MEM, "KERNEL_SHARED_MEM"},
     {KERNEL_COALESCED_MEM_READ, "KERNEL_COALESCED_MEM_READ"},
+    {KERNEL_COMPACT_MEM, "KERNEL_COMPACT_MEM"}
 };
 struct AdditionalTestConfig {
   unsigned int randomSeed;
@@ -34,7 +36,8 @@ struct AdditionalTestConfig {
 // L: text length, typically 1e6
 // Charset (4 for ACGT)
 // Kernel version
-void eval(int M, int N, int L, KernelAvailable kernel_id, const int charSetSize, const char* testName, AdditionalTestConfig config) {
+template <int charSetSize>
+void eval(int M, int N, int L, KernelAvailable kernel_id, const char* testName, AdditionalTestConfig config) {
   // Generate random patterns and text
   printf("====================================\n");
   printf("Start testing " YELLOW "%s" NORMAL ": " INFO "(pattern length = %d, %d patterns, text length = %d, |CharSet|=%d)\n" NORMAL,
@@ -96,6 +99,8 @@ void eval(int M, int N, int L, KernelAvailable kernel_id, const int charSetSize,
     ACGPUSharedMemLaunch(d_tr, d_text, d_occur, M, L, charSetSize, trieNodeNumber);
   else if (kernel_id == KERNEL_COALESCED_MEM_READ)
     ACGPUCoalecedMemReadLaunch(d_tr, d_text, d_occur, M, L, charSetSize);
+  else if (kernel_id == KERNEL_COMPACT_MEM)
+    ACGPUCompactMemLaunch<charSetSize>(d_tr, d_text, d_occur, M, L);
   else {
     printf(RED "Error: kernel_id = %d is not supported", kernel_id);
     TIMER_STOP();
@@ -149,13 +154,13 @@ bad:
 }
 int main() {
   srand(time(NULL));
-  // eval(8, 16000, 1e6, 0, 4, "ACSimple");
-  // eval(8, 16000, 1e7, 0, 4, "ACSimple");
-  eval(8, 16000, 1e8, KERNEL_SIMPLE, 4, "ACSimple", {23333, false});
-  eval(8, 16000, 1e8, KERNEL_COALESCED_MEM_READ, 4, "ACCoalecedMemRead", {23333, false});
-  // eval(8, 16000, 1e8, 1, 4, "ACSharedMem");
-  // eval(8, 160, 1e8, 0, 4, "ACSimple");
-  eval(8, 16000, 1e8, KERNEL_SHARED_MEM, 4, "ACSharedMem", {23333, false});
-  eval(8, 16000, 1e8, KERNEL_SHARED_MEM, 4, "ACSharedMemWithReordering", {23333, true});
-  // eval(8, 16000, 1e9, 0, 4, "ACSimple");
+  // eval<4>(8, 16000, 1e6, 0, "ACSimple");
+  // eval<4>(8, 16000, 1e7, 0, "ACSimple");
+  eval<4>(8, 16000, 1e8, KERNEL_SIMPLE, "ACSimple", {23333, false});
+  eval<4>(8, 16000, 1e8, KERNEL_COALESCED_MEM_READ, "ACCoalecedMemRead", {23333, false});
+  // eval<4>(8, 16000, 1e8, 1, "ACSharedMem");
+  // eval<4>(8, 160, 1e8, 0, "ACSimple");
+  eval<4>(8, 16000, 1e8, KERNEL_SHARED_MEM, "ACSharedMem", {23333, false});
+  eval<4>(8, 16000, 1e8, KERNEL_SHARED_MEM, "ACSharedMemWithReordering", {23333, true});
+  // eval<4>(8, 16000, 1e9, 0, "ACSimple");
 }

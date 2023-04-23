@@ -122,6 +122,39 @@ void ACGPUSharedMemLaunch(const int* tr, const char* text, int* occur, const int
 #endif
 }
 
+template <typename T>
+__global__ void CompactText(const char* text, T* text_conpact, const int L) {
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx < L)
+    text_conpact[idx] = text[idx];
+}
+
+template <typename T, int TILE_SIZE>
+__global__ void ACGPUCompactMem(const int* tr, const T* text_conpact, int* occur, const int M, const int L, const int charSetSize) {
+  int idx         = blockIdx.x * blockDim.x * TILE_SIZE;
+  int threadStart = idx + threadIdx.x * TILE_SIZE;
+  int threadEnd   = threadStart + TILE_SIZE + M - 1;
+
+  int state = 0;
+  for (int i = threadStart; i < threadEnd && i < L; i++) {
+    state = tr[state * charSetSize + text[i]];
+    atomicAdd(&occur[state], 1); // Optimizable
+  }
+}
+
+
+template <int charSetSize>
+void ACGPUCompactMemLaunch(const int* tr, const char* text, int* occur, const int M, const int L) {
+  const int TILE_SIZE  = 32;
+  const int BLOCK_SIZE = 512;
+  const int GPUbinSize = 1024;
+  int blockNum         = (L - 1) / (BLOCK_SIZE * TILE_SIZE) + 1;
+  int2* d_text_compact;
+  CUDA_RUNTIME(cudaMalloc(&d_text_compact, (L + 1) * sizeof(int2)));
+  CompactText<<<int2>>>(text, d_text_compact, L);
+  ACGPUSimple<int2, TILE_SIZE><<<blockNum, BLOCK_SIZE>>>(tr, text, occur, M, L, charSetSize);
+}
+
 // shared memory
 // coalesced memory fetch into shared memory
 // int4
