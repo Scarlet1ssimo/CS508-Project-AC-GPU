@@ -100,6 +100,9 @@ For charSet that doesn't occupy full 8bit-char space, we try to compress the tex
 
 ## Benchmark
 
+https://github.com/kaushiksk/boyer-moore-aho-corasick-in-cuda
+https://github.com/Abhi9k/AhoCorasickParallel
+
 | Reference Impl.            | Benchmark | Parameter                                | Repo Time  | Our Time                  |
 | -------------------------- | --------- | ---------------------------------------- | ---------- | ------------------------- |
 | Abhi9k                     | small     | `L=5941698, N=32, M=4, charSetSize=92`   | 0.841ms    | 0.111520 ms `ACSharedMem` |

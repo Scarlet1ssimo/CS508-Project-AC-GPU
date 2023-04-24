@@ -192,7 +192,7 @@ int main() {
   eval<139>(0, 32, 0, KERNEL_SHARED_MEM, "ACSharedMem", {0, false, &input2l});
   eval<4>(0, 6, 0, KERNEL_SHARED_MEM, "ACSharedMem", {0, false, &input1});
 
-  eval<4>(8, 16000, 1e8, KERNEL_SIMPLE, "ACSimple", {23333, false});
+  // eval<4>(8, 16000, 1e8, KERNEL_SIMPLE, "ACSimple", {23333, false});
   // eval<4>(8, 16000, 1e8, KERNEL_COALESCED_MEM_READ, "ACCoalecedMemRead", {23333, false});
   // eval<4>(8, 16000, 1e8, KERNEL_SHARED_MEM, "ACSharedMem", {23333, false});
   // eval<4>(8, 16000, 1e8, KERNEL_SHARED_MEM, "ACSharedMemWithReordering", {23333, true});
