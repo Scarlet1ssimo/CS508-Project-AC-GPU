@@ -6,7 +6,6 @@ Finished sequential CPU version and GPU baseline version, as well as the optimiz
 Issues we've encountered: Not many optimization options for now \
 Next-week Plan: Test the performance. Come up with new optimization methods.
 
-
 ### Problem description:
 
 It's a multi-pattern string matching problem. Let `CharSet` be character set, with `charSetSize` different characters. There are `N` patterns, each with length of `M`, and `text`, a long string with length of `L`. We need to find the number of occurrences of all patterns inside `text`.
@@ -33,6 +32,7 @@ occur[3]=2;
 ```
 
 In our problem setting:
+
 ```
 L=1e8;
 M=8;
@@ -42,7 +42,7 @@ charSetSize=4;
 
 ## CPU:
 
-~720ms on RAI
+~522ms on RAI
 
 ## GPU Baseline:
 
@@ -91,3 +91,9 @@ Running Aho-Corasick Algorithm on GPU... 5.472256 ms
 Use shared memory to coalescedly load global memory before use.
 
 ~7.0 ms on RAI
+
+## Optimization 3
+
+For charSet that doesn't occupy full 8bit-char space, we try to compress the text so that 8bit-char can be filled with four 2bit-char (`int2x4_t`) or two 4bit-char (`int4x2_t`).
+
+~6.5 ms on RAI for int2x4_t.

@@ -1,5 +1,4 @@
 #include "kernel.h"
-#include <cstddef>
 #include <cstdio>
 
 __global__ void CompactText(const char* text, char* text_conpact, const int L) {

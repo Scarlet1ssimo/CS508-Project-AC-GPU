@@ -3,6 +3,7 @@
 #include "utility.h"
 #include <cstdio>
 #include <cstdlib>
+#include <ctime>
 #include <map>
 using std::map;
 
@@ -20,12 +21,10 @@ enum KernelAvailable {
   KERNEL_COALESCED_MEM_READ,
   KERNEL_COMPACT_MEM,
 };
-std::map<KernelAvailable, const char*> kernelName = {
-    {KERNEL_SIMPLE, "KERNEL_SIMPLE"},
-    {KERNEL_SHARED_MEM, "KERNEL_SHARED_MEM"},
-    {KERNEL_COALESCED_MEM_READ, "KERNEL_COALESCED_MEM_READ"},
-    {KERNEL_COMPACT_MEM, "KERNEL_COMPACT_MEM"}
-};
+std::map<KernelAvailable, const char*> kernelName = {{KERNEL_SIMPLE, "KERNEL_SIMPLE"},
+                                                     {KERNEL_SHARED_MEM, "KERNEL_SHARED_MEM"},
+                                                     {KERNEL_COALESCED_MEM_READ, "KERNEL_COALESCED_MEM_READ"},
+                                                     {KERNEL_COMPACT_MEM, "KERNEL_COMPACT_MEM"}};
 struct AdditionalTestConfig {
   unsigned int randomSeed;
   bool ReorderTrie;
@@ -47,7 +46,11 @@ void eval(int M, int N, int L, KernelAvailable kernel_id, const char* testName, 
     printf(ADDITIONAL "Using random seed = %u\n" NORMAL, config.randomSeed);
     srand(config.randomSeed);
   }
+  if (SizeTraits<charSetSize>::numElement == 1 && kernel_id == KERNEL_COMPACT_MEM) {
+    printf(ADDITIONAL "Detected using compact memory for incompressible charSet.\n" NORMAL);
+  }
 
+  TIMER_START("Generating random patterns and text");
   char** patterns = (char**) malloc(N * sizeof(char*));
   for (int i = 0; i < N; i++) {
     patterns[i] = (char*) malloc((M + 1) * sizeof(char));
@@ -55,6 +58,7 @@ void eval(int M, int N, int L, KernelAvailable kernel_id, const char* testName, 
   }
   char* text = (char*) malloc((L + 1) * sizeof(char));
   random_string(text, charSetSize, L);
+  TIMER_STOP();
 
   // Allocate memory on CPU for building Trie and Aho-Corasick Algorithm
   TIMER_START("Building Trie and Aho-Corasick Automaton on CPU");
@@ -81,10 +85,16 @@ void eval(int M, int N, int L, KernelAvailable kernel_id, const char* testName, 
   // Setup for GPU launch
   int *d_tr, *d_occur;
   char* d_text;
+  using T = typename SizeTraits<charSetSize>::elementTy;
+  T* d_text_compact;
   TIMER_START("Allocating and copying memory on GPU");
   CUDA_RUNTIME(cudaMalloc(&d_tr, trieNodeNumber * charSetSize * sizeof(int)));
   CUDA_RUNTIME(cudaMalloc(&d_occur, trieNodeNumber * sizeof(int)));
   CUDA_RUNTIME(cudaMalloc(&d_text, (L + 1) * sizeof(char)));
+  if (kernel_id == KERNEL_COMPACT_MEM) {
+    printf(ADDITIONAL "Also for compact text... " NORMAL);
+    CUDA_RUNTIME(cudaMalloc(&d_text_compact, (L + 1) * sizeof(T)));
+  }
   CUDA_RUNTIME(cudaMemcpy(d_tr, tr, trieNodeNumber * charSetSize * sizeof(int), cudaMemcpyHostToDevice));
   CUDA_RUNTIME(cudaMemcpy(d_text, text, (L + 1) * sizeof(char), cudaMemcpyHostToDevice));
   CUDA_RUNTIME(cudaMemset(d_occur, 0, trieNodeNumber * sizeof(int)));
@@ -100,11 +110,11 @@ void eval(int M, int N, int L, KernelAvailable kernel_id, const char* testName, 
   else if (kernel_id == KERNEL_COALESCED_MEM_READ)
     ACGPUCoalecedMemReadLaunch<charSetSize>(d_tr, d_text, d_occur, M, L);
   else if (kernel_id == KERNEL_COMPACT_MEM)
-    ACGPUCompactMemLaunch<charSetSize>(d_tr, d_text, d_occur, M, L);
+    ACGPUCompactMemLaunch<charSetSize, T>(d_tr, d_text, d_text_compact, d_occur, M, L);
   else {
     printf(RED "Error: kernel_id = %d is not supported", kernel_id);
     TIMER_STOP();
-    // goto bad;
+    goto bad;
   }
   CUDA_RUNTIME(cudaDeviceSynchronize());
   TIMER_STOP();
@@ -141,6 +151,9 @@ bad:
   CUDA_RUNTIME(cudaFree(d_tr));
   CUDA_RUNTIME(cudaFree(d_occur));
   CUDA_RUNTIME(cudaFree(d_text));
+  if (kernel_id == KERNEL_COMPACT_MEM) {
+    CUDA_RUNTIME(cudaFree(d_text_compact));
+  }
   free(tr);
   free(idx);
   free(fail);
@@ -154,15 +167,10 @@ bad:
 }
 int main() {
   srand(time(NULL));
-  // eval<4>(8, 16000, 1e6, 0, "ACSimple");
-  // eval<4>(8, 16000, 1e7, 0, "ACSimple");
+  // eval<26>(8, 16000, 1e6, KERNEL_COMPACT_MEM, "ACCompactMem", {23333, false});
   eval<4>(8, 16000, 1e8, KERNEL_SIMPLE, "ACSimple", {23333, false});
   eval<4>(8, 16000, 1e8, KERNEL_COALESCED_MEM_READ, "ACCoalecedMemRead", {23333, false});
-  // eval<4>(8, 16000, 1e8, 1, "ACSharedMem");
-  // eval<4>(8, 160, 1e8, 0, "ACSimple");
   eval<4>(8, 16000, 1e8, KERNEL_SHARED_MEM, "ACSharedMem", {23333, false});
   eval<4>(8, 16000, 1e8, KERNEL_SHARED_MEM, "ACSharedMemWithReordering", {23333, true});
-  // eval<4>(8, 16000, 1e9, 0, "ACSimple");
-
-  eval<4>(8, 16000, 1e8, KERNEL_COMPACT_MEM, "ACCompactMem", {23333, true});
+  eval<4>(8, 16000, 1e8, KERNEL_COMPACT_MEM, "ACCompactMem", {23333, false});
 }

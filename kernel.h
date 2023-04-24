@@ -1,7 +1,7 @@
 #pragma once
 #include "compact.h"
-#include "utility.h"
 #include "kernel_impl.h"
+#include "utility.h"
 
 extern Timer timer;
 
@@ -49,20 +49,20 @@ __global__ void CompactText(const char* text, char* text_conpact, const int L);
 __global__ void CompactText(const char* text, int4x2_t* text_conpact, const int L);
 __global__ void CompactText(const char* text, int2x4_t* text_conpact, const int L);
 
-
-template <int charSetSize>
-void ACGPUCompactMemLaunch(const int* tr, const char* text, int* occur, int M, int L) {
-  using T = typename SizeTraits<charSetSize>::elementTy;
+template <int charSetSize, typename T>
+void ACGPUCompactMemLaunch(const int* tr, const char* text, T* text_compact, int* occur, int M, int L) {
   const int numElement = SizeTraits<charSetSize>::numElement;
   const int TILE_SIZE  = 32;
   const int BLOCK_SIZE = 512;
-  
-  T* d_text_compact;
-  cudaMalloc(&d_text_compact, (L + 1) * sizeof(T));
-  // TIMER_START("CompactMem");
-  CompactText<<<ceil(L * 1.0 / (BLOCK_SIZE * numElement)), BLOCK_SIZE>>>(text, d_text_compact, L);
-  cudaDeviceSynchronize();
-  // TIMER_STOP();
-  ACGPUCompactMem<charSetSize, TILE_SIZE><<<ceil(L * 1.0 / (BLOCK_SIZE * TILE_SIZE * numElement)), BLOCK_SIZE>>>(tr, d_text_compact, occur, M, L);
-  cudaFree(d_text_compact);
+
+  if (numElement > 1) {
+    // Compressible text, compact text
+    CompactText<<<ceil(L * 1.0 / (BLOCK_SIZE * numElement)), BLOCK_SIZE>>>(text, text_compact, L);
+    cudaDeviceSynchronize();
+    ACGPUCompactMem<charSetSize, TILE_SIZE>
+        <<<ceil(L * 1.0 / (BLOCK_SIZE * TILE_SIZE * numElement)), BLOCK_SIZE>>>(tr, text_compact, occur, M, L);
+  } else {
+    // Incompressible text, trigger the kernel directly
+    ACGPUCompactMem<charSetSize, TILE_SIZE><<<ceil(L * 1.0 / (BLOCK_SIZE * TILE_SIZE * numElement)), BLOCK_SIZE>>>(tr, text, occur, M, L);
+  }
 }

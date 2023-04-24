@@ -1,5 +1,6 @@
 #pragma once
 
+// GPU Baseline
 template <int charSetSize, int TILE_SIZE, int BLOCK_SIZE>
 __global__ void ACGPUSimple(const int* tr, const char* text, int* occur, const int M, const int L) {
   int idx         = blockIdx.x * blockDim.x * TILE_SIZE;
@@ -13,6 +14,7 @@ __global__ void ACGPUSimple(const int* tr, const char* text, int* occur, const i
   }
 }
 
+// Optimization 2: Shared Memory for Coalesced Memory Access
 template <int charSetSize, int TILE_SIZE, int BLOCK_SIZE>
 __global__ void ACGPUCoalecedMemRead(const int* tr, const char* text, int* occur, const int M, const int L) {
   int idx         = blockIdx.x * blockDim.x * TILE_SIZE;
@@ -27,13 +29,13 @@ __global__ void ACGPUCoalecedMemRead(const int* tr, const char* text, int* occur
   int state = 0;
   for (int i = threadStart; i < threadEnd && idx + i < L; i++) {
     state = tr[state * charSetSize + localText[i]];
-    atomicAdd(&occur[state], 1); // Optimizable
+    atomicAdd(&occur[state], 1);
   }
 }
 
+// Optimization 1: Shared Memory for GPU bin
 template <int charSetSize, int TILE_SIZE, int BLOCK_SIZE, int GPUbinSize>
-__global__ void ACGPUSharedMem(const int* tr, const char* text, int* occur, const int M, const int L,
-                               const int trieNodeNumber) {
+__global__ void ACGPUSharedMem(const int* tr, const char* text, int* occur, const int M, const int L, const int trieNodeNumber) {
   int idx         = blockIdx.x * blockDim.x * TILE_SIZE;
   int threadStart = idx + threadIdx.x * TILE_SIZE;
   int threadEnd   = threadStart + TILE_SIZE + M - 1;
@@ -45,7 +47,7 @@ __global__ void ACGPUSharedMem(const int* tr, const char* text, int* occur, cons
   int state = 0;
   for (int i = threadStart; i < threadEnd && i < L; i++) {
     state = tr[state * charSetSize + text[i]];
-    if (state < GPUbinSize) // CPU:Reorder trie node index by depth(frequency)
+    if (state < GPUbinSize) // Control divergence may occur here thus hurt the performance
       atomicAdd(&localOccur[state], 1);
     else
       atomicAdd(&occur[state], 1);
@@ -55,9 +57,10 @@ __global__ void ACGPUSharedMem(const int* tr, const char* text, int* occur, cons
     atomicAdd(&occur[i], localOccur[i]);
 }
 
+// Profiling version for Optimization 1
 template <int charSetSize, int TILE_SIZE, int BLOCK_SIZE, int GPUbinSize>
-__global__ void ACGPUSharedMemProfiling(const int* tr, const char* text, int* occur, const int M, const int L,
-                                        const int trieNodeNumber, unsigned long long* branchCnt) {
+__global__ void ACGPUSharedMemProfiling(const int* tr, const char* text, int* occur, const int M, const int L, const int trieNodeNumber,
+                                        unsigned long long* branchCnt) {
   int idx         = blockIdx.x * blockDim.x * TILE_SIZE;
   int threadStart = idx + threadIdx.x * TILE_SIZE;
   int threadEnd   = threadStart + TILE_SIZE + M - 1;
@@ -82,6 +85,7 @@ __global__ void ACGPUSharedMemProfiling(const int* tr, const char* text, int* oc
     atomicAdd(&occur[i], localOccur[i]);
 }
 
+// Optimization 3: Compact Memory; Template specialization for char
 template <int charSetSize, int TILE_SIZE>
 __global__ void ACGPUCompactMem(const int* tr, const char* text_conpact, int* occur, const int M, const int L) {
   int idx         = blockIdx.x * blockDim.x * TILE_SIZE;
@@ -95,6 +99,7 @@ __global__ void ACGPUCompactMem(const int* tr, const char* text_conpact, int* oc
   }
 }
 
+// Optimization 3: Compact Memory; Template specialization for 4bit (charSetSize <= 16)
 template <int charSetSize, int TILE_SIZE>
 __global__ void ACGPUCompactMem(const int* tr, const int4x2_t* text_conpact, int* occur, const int M, const int L) {
   int idx         = blockIdx.x * blockDim.x + threadIdx.x;
@@ -107,15 +112,16 @@ __global__ void ACGPUCompactMem(const int* tr, const int4x2_t* text_conpact, int
     atomicAdd(&occur[state], 1);
     state = tr[state * charSetSize + text_conpact[i].h1];
     atomicAdd(&occur[state], 1);
-    if (i == threadEnd - 1 && threadEnd < L / 2) {
-      if (M - 1 % 2 == 1) {
-        state = tr[state * charSetSize + text_conpact[threadEnd].h0];
-        atomicAdd(&occur[state], 1);
-      }
+  }
+  if (threadEnd < L / 2) { // If the last thread is not enough to process the last 2 characters
+    if ((M - 1) % 2 == 1) {
+      state = tr[state * charSetSize + text_conpact[threadEnd].h0];
+      atomicAdd(&occur[state], 1);
     }
   }
 }
 
+// Optimization 3: Compact Memory; Template specialization for 2bit (charSetSize <= 4)
 template <int charSetSize, int TILE_SIZE>
 __global__ void ACGPUCompactMem(const int* tr, const int2x4_t* text_conpact, int* occur, const int M, const int L) {
   int idx         = blockIdx.x * blockDim.x + threadIdx.x;
@@ -132,20 +138,19 @@ __global__ void ACGPUCompactMem(const int* tr, const int2x4_t* text_conpact, int
     atomicAdd(&occur[state], 1);
     state = tr[state * charSetSize + text_conpact[i].q3];
     atomicAdd(&occur[state], 1);
-    if (i == threadEnd - 1 && threadEnd < L / 4) {
-      if ((M - 1) % 4 >= 1) {
-        state = tr[state * charSetSize + text_conpact[threadEnd].q0];
-        atomicAdd(&occur[state], 1);
-      }
-      if ((M - 1) % 4 >= 2) {
-        state = tr[state * charSetSize + text_conpact[threadEnd].q1];
-        atomicAdd(&occur[state], 1);
-      }
-      if ((M - 1) % 4 >= 3) {
-        state = tr[state * charSetSize + text_conpact[threadEnd].q2];
-        atomicAdd(&occur[state], 1);
-      }
+  }
+  if (threadEnd < L / 4) { // If the last thread is not enough to process the last 4 characters
+    if ((M - 1) % 4 >= 1) {
+      state = tr[state * charSetSize + text_conpact[threadEnd].q0];
+      atomicAdd(&occur[state], 1);
+    }
+    if ((M - 1) % 4 >= 2) {
+      state = tr[state * charSetSize + text_conpact[threadEnd].q1];
+      atomicAdd(&occur[state], 1);
+    }
+    if ((M - 1) % 4 >= 3) {
+      state = tr[state * charSetSize + text_conpact[threadEnd].q2];
+      atomicAdd(&occur[state], 1);
     }
   }
 }
-
