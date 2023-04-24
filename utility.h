@@ -1,5 +1,6 @@
 #pragma once
 #include <cstdio>
+#include <cstdlib>
 
 #define RED "\x1B[31m"
 #define GREEN "\x1B[32m"
@@ -42,3 +43,21 @@ struct Timer {
 #define TIMER_START(msg) timer.StartAndPrint(msg)
 #define TIMER_STOP() timer.StopAndPrint()
 #define SET_COLOR(color) printf(color)
+
+struct CustomInput {
+  const char* patternsFile;
+  const char* textFile;
+};
+struct AdditionalTestConfig {
+  unsigned int randomSeed = 0;
+  bool ReorderTrie        = false;
+  CustomInput* CI         = nullptr;
+};
+
+static void random_string(unsigned char* dst, const int charSetSize, const int len) {
+  for (int i = 0; i < len; ++i)
+    dst[i] = rand() % charSetSize;
+  dst[len] = 0;
+}
+void randomData(int M, int N, int L, int charSetSize, unsigned char*** patterns, unsigned char** text);
+bool parseDataFrom(int& M, const int N, int& L, int charSetSize, unsigned char*** patterns, unsigned char** text, const CustomInput& CI);

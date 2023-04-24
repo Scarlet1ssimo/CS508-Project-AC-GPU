@@ -3,10 +3,8 @@
 #include "kernel_impl.h"
 #include "utility.h"
 
-extern Timer timer;
-
 template <int charSetSize>
-void ACGPUSimpleLaunch(const int* tr, const char* text, int* occur, const int M, const int L) {
+void ACGPUSimpleLaunch(const int* tr, const unsigned char* text, int* occur, const int M, const int L) {
   const int TILE_SIZE  = 32;
   const int BLOCK_SIZE = 512;
   int blockNum         = (L - 1) / (BLOCK_SIZE * TILE_SIZE) + 1;
@@ -15,7 +13,7 @@ void ACGPUSimpleLaunch(const int* tr, const char* text, int* occur, const int M,
 
 // #define PROFILING
 template <int charSetSize>
-void ACGPUSharedMemLaunch(const int* tr, const char* text, int* occur, const int M, const int L, const int trieNodeNumber) {
+void ACGPUSharedMemLaunch(const int* tr, const unsigned char* text, int* occur, const int M, const int L, const int trieNodeNumber) {
   const int TILE_SIZE  = 32;
   const int BLOCK_SIZE = 512;
   const int GPUbinSize = 1024;
@@ -37,7 +35,7 @@ void ACGPUSharedMemLaunch(const int* tr, const char* text, int* occur, const int
 }
 
 template <int charSetSize>
-void ACGPUCoalecedMemReadLaunch(const int* tr, const char* text, int* occur, const int M, const int L) {
+void ACGPUCoalecedMemReadLaunch(const int* tr, const unsigned char* text, int* occur, const int M, const int L) {
   const int TILE_SIZE  = 64;
   const int BLOCK_SIZE = 32;
   int blockNum         = (L - 1) / (BLOCK_SIZE * TILE_SIZE) + 1;
@@ -45,12 +43,12 @@ void ACGPUCoalecedMemReadLaunch(const int* tr, const char* text, int* occur, con
       <<<blockNum, BLOCK_SIZE, (TILE_SIZE * BLOCK_SIZE + M - 1) * sizeof(int)>>>(tr, text, occur, M, L);
 }
 
-__global__ void CompactText(const char* text, char* text_conpact, const int L);
-__global__ void CompactText(const char* text, int4x2_t* text_conpact, const int L);
-__global__ void CompactText(const char* text, int2x4_t* text_conpact, const int L);
+__global__ void CompactText(const unsigned char* text, unsigned char* text_conpact, const int L);
+__global__ void CompactText(const unsigned char* text, int4x2_t* text_conpact, const int L);
+__global__ void CompactText(const unsigned char* text, int2x4_t* text_conpact, const int L);
 
 template <int charSetSize, typename T>
-void ACGPUCompactMemLaunch(const int* tr, const char* text, T* text_compact, int* occur, int M, int L) {
+void ACGPUCompactMemLaunch(const int* tr, const unsigned char* text, T* text_compact, int* occur, int M, int L) {
   const int numElement = SizeTraits<charSetSize>::numElement;
   const int TILE_SIZE  = 32;
   const int BLOCK_SIZE = 512;

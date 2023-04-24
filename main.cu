@@ -2,7 +2,6 @@
 #include "kernel.h"
 #include "utility.h"
 #include <cstdio>
-#include <cstdlib>
 #include <ctime>
 #include <map>
 using std::map;
@@ -25,10 +24,6 @@ std::map<KernelAvailable, const char*> kernelName = {{KERNEL_SIMPLE, "KERNEL_SIM
                                                      {KERNEL_SHARED_MEM, "KERNEL_SHARED_MEM"},
                                                      {KERNEL_COALESCED_MEM_READ, "KERNEL_COALESCED_MEM_READ"},
                                                      {KERNEL_COMPACT_MEM, "KERNEL_COMPACT_MEM"}};
-struct AdditionalTestConfig {
-  unsigned int randomSeed;
-  bool ReorderTrie;
-};
 
 // M: pattern length (like 8 for pattern "ACGTACGT")
 // N: number of all patterns, typically 16000
@@ -50,14 +45,17 @@ void eval(int M, int N, int L, KernelAvailable kernel_id, const char* testName, 
     printf(ADDITIONAL "Detected using compact memory for incompressible charSet.\n" NORMAL);
   }
 
-  TIMER_START("Generating random patterns and text");
-  char** patterns = (char**) malloc(N * sizeof(char*));
-  for (int i = 0; i < N; i++) {
-    patterns[i] = (char*) malloc((M + 1) * sizeof(char));
-    random_string(patterns[i], charSetSize, M);
+  unsigned char **patterns, *text;
+  if (config.CI != nullptr) {
+    TIMER_START("Parsing file from config...");
+    if (!parseDataFrom(M, N, L, charSetSize, &patterns, &text, *config.CI)) {
+      printf("Failed to parse data from config file. Abort.\n");
+      return;
+    }
+  } else {
+    TIMER_START("Generating random patterns and text");
+    randomData(M, N, L, charSetSize, &patterns, &text);
   }
-  char* text = (char*) malloc((L + 1) * sizeof(char));
-  random_string(text, charSetSize, L);
   TIMER_STOP();
 
   // Allocate memory on CPU for building Trie and Aho-Corasick Algorithm
@@ -66,7 +64,9 @@ void eval(int M, int N, int L, KernelAvailable kernel_id, const char* testName, 
   int* tr           = (int*) malloc(trieNodeBound * charSetSize * sizeof(int)); // tr[trieNodeBound][charSetSize] -> trieNodeBound;
   int* idx          = (int*) malloc(N * sizeof(int));                           // idx[N] -> trieNodeBound;
   memset(tr, 0, trieNodeBound * charSetSize * sizeof(int));
+  memset(idx, 0, N * sizeof(int));
   int trieNodeNumber = TrieBuildCPU(patterns, tr, idx, M, N, charSetSize);
+  printf("Getting %d Trie nodes... ", trieNodeNumber);
   if (config.ReorderTrie) {
     printf(ADDITIONAL "\nReordering Trie...");
     TrieReorder(tr, idx, N, trieNodeNumber, charSetSize);
@@ -76,7 +76,9 @@ void eval(int M, int N, int L, KernelAvailable kernel_id, const char* testName, 
   int* occur_gpu = (int*) malloc(trieNodeNumber * sizeof(int)); // occur[trieNodeNumber] -> L;
   int* occur_cpu = (int*) malloc(trieNodeNumber * sizeof(int)); // occur[trieNodeNumber] -> L;
   memset(fail, 0, trieNodeNumber * sizeof(int));
+  memset(postOrder, 0, trieNodeNumber * sizeof(int));
   memset(occur_cpu, 0, trieNodeNumber * sizeof(int));
+  memset(occur_gpu, 0, trieNodeNumber * sizeof(int));
 
   // Build Aho-Corasick Automaton on CPU
   ACBuildCPU(tr, fail, postOrder, charSetSize);
@@ -84,19 +86,19 @@ void eval(int M, int N, int L, KernelAvailable kernel_id, const char* testName, 
 
   // Setup for GPU launch
   int *d_tr, *d_occur;
-  char* d_text;
+  unsigned char* d_text;
   using T = typename SizeTraits<charSetSize>::elementTy;
   T* d_text_compact;
   TIMER_START("Allocating and copying memory on GPU");
   CUDA_RUNTIME(cudaMalloc(&d_tr, trieNodeNumber * charSetSize * sizeof(int)));
   CUDA_RUNTIME(cudaMalloc(&d_occur, trieNodeNumber * sizeof(int)));
-  CUDA_RUNTIME(cudaMalloc(&d_text, (L + 1) * sizeof(char)));
+  CUDA_RUNTIME(cudaMalloc(&d_text, (L + 1) * sizeof(unsigned char)));
   if (kernel_id == KERNEL_COMPACT_MEM) {
     printf(ADDITIONAL "Also for compact text... " NORMAL);
     CUDA_RUNTIME(cudaMalloc(&d_text_compact, (L + 1) * sizeof(T)));
   }
   CUDA_RUNTIME(cudaMemcpy(d_tr, tr, trieNodeNumber * charSetSize * sizeof(int), cudaMemcpyHostToDevice));
-  CUDA_RUNTIME(cudaMemcpy(d_text, text, (L + 1) * sizeof(char), cudaMemcpyHostToDevice));
+  CUDA_RUNTIME(cudaMemcpy(d_text, text, (L + 1) * sizeof(unsigned char), cudaMemcpyHostToDevice));
   CUDA_RUNTIME(cudaMemset(d_occur, 0, trieNodeNumber * sizeof(int)));
   TIMER_STOP();
 
@@ -167,10 +169,32 @@ bad:
 }
 int main() {
   srand(time(NULL));
-  // eval<26>(8, 16000, 1e6, KERNEL_COMPACT_MEM, "ACCompactMem", {23333, false});
+  CustomInput input1 = {
+      // Found from https://github.com/kaushiksk/boyer-moore-aho-corasick-in-cuda.git
+      "dataset/boyer-moore-aho-corasick-in-cuda/keywords.txt",
+      "dataset/boyer-moore-aho-corasick-in-cuda/data.txt",
+  };
+  // Found from https://github.com/Abhi9k/AhoCorasickParallel.git
+  CustomInput input2l = {
+      "dataset/cuda_pattern_matching/keywords.txt",
+      "dataset/cuda_pattern_matching/large.txt",
+  };
+  CustomInput input2m = {
+      "dataset/cuda_pattern_matching/keywords.txt",
+      "dataset/cuda_pattern_matching/medium.txt",
+  };
+  CustomInput input2s = {
+      "dataset/cuda_pattern_matching/keywords.txt",
+      "dataset/cuda_pattern_matching/small.txt",
+  };
+  eval<92>(0, 32, 0, KERNEL_SHARED_MEM, "ACSharedMem", {0, false, &input2s});
+  eval<138>(0, 32, 0, KERNEL_SHARED_MEM, "ACSharedMem", {0, false, &input2m});
+  eval<139>(0, 32, 0, KERNEL_SHARED_MEM, "ACSharedMem", {0, false, &input2l});
+  eval<4>(0, 6, 0, KERNEL_SHARED_MEM, "ACSharedMem", {0, false, &input1});
+
   eval<4>(8, 16000, 1e8, KERNEL_SIMPLE, "ACSimple", {23333, false});
-  eval<4>(8, 16000, 1e8, KERNEL_COALESCED_MEM_READ, "ACCoalecedMemRead", {23333, false});
-  eval<4>(8, 16000, 1e8, KERNEL_SHARED_MEM, "ACSharedMem", {23333, false});
-  eval<4>(8, 16000, 1e8, KERNEL_SHARED_MEM, "ACSharedMemWithReordering", {23333, true});
-  eval<4>(8, 16000, 1e8, KERNEL_COMPACT_MEM, "ACCompactMem", {23333, false});
+  // eval<4>(8, 16000, 1e8, KERNEL_COALESCED_MEM_READ, "ACCoalecedMemRead", {23333, false});
+  // eval<4>(8, 16000, 1e8, KERNEL_SHARED_MEM, "ACSharedMem", {23333, false});
+  // eval<4>(8, 16000, 1e8, KERNEL_SHARED_MEM, "ACSharedMemWithReordering", {23333, true});
+  // eval<4>(8, 16000, 1e8, KERNEL_COMPACT_MEM, "ACCompactMem", {23333, false});
 }

@@ -15,7 +15,7 @@ struct int2x4_t {
 template <int charSetSize>
 struct SizeTraits
 {
-  typedef char elementTy;
+  typedef unsigned char elementTy;
   static const int numElement = 1;
 };
 

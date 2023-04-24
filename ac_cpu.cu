@@ -1,12 +1,8 @@
 #include <cassert>
 #include <queue>
 using std::queue;
-void random_string(char* dst, const int charSetSize, const int len) {
-  for (int i = 0; i < len; ++i)
-    dst[i] = rand() % charSetSize;
-  dst[len] = 0;
-}
-int TrieBuildCPU(char* const* patterns, int* tr, int* idx, const int M, const int N, const int charSetSize) {
+
+int TrieBuildCPU(unsigned char* const* patterns, int* tr, int* idx, const int M, const int N, const int charSetSize) {
   int trieNodeNumber = 1;
   for (int i = 0; i < N; i++) {
     int state = 0;
@@ -75,7 +71,7 @@ void ACBuildCPU(int* tr, int* fail, int* postOrder, const int charSetSize) {
   }
   // postOrderCnt == stateCnt-1, because state 0 is not included
 }
-void ACCPU(const int* tr, const char* text, int* occur, const int L, const int charSetSize) {
+void ACCPU(const int* tr, const unsigned char* text, int* occur, const int L, const int charSetSize) {
   int state = 0;
   for (int i = 0; i < L; i++) {
     state = tr[state * charSetSize + text[i]];

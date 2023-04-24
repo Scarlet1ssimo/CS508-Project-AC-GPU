@@ -2,7 +2,7 @@
 
 // GPU Baseline
 template <int charSetSize, int TILE_SIZE, int BLOCK_SIZE>
-__global__ void ACGPUSimple(const int* tr, const char* text, int* occur, const int M, const int L) {
+__global__ void ACGPUSimple(const int* tr, const unsigned char* text, int* occur, const int M, const int L) {
   int idx         = blockIdx.x * blockDim.x * TILE_SIZE;
   int threadStart = idx + threadIdx.x * TILE_SIZE;
   int threadEnd   = threadStart + TILE_SIZE + M - 1;
@@ -16,12 +16,12 @@ __global__ void ACGPUSimple(const int* tr, const char* text, int* occur, const i
 
 // Optimization 2: Shared Memory for Coalesced Memory Access
 template <int charSetSize, int TILE_SIZE, int BLOCK_SIZE>
-__global__ void ACGPUCoalecedMemRead(const int* tr, const char* text, int* occur, const int M, const int L) {
+__global__ void ACGPUCoalecedMemRead(const int* tr, const unsigned char* text, int* occur, const int M, const int L) {
   int idx         = blockIdx.x * blockDim.x * TILE_SIZE;
   int threadStart = threadIdx.x * TILE_SIZE;
   int threadEnd   = threadStart + TILE_SIZE + M - 1;
 
-  extern __shared__ char localText[];
+  extern __shared__ unsigned char localText[];
   for (int i = threadIdx.x; i < blockDim.x * TILE_SIZE + M - 1; i += blockDim.x)
     localText[i] = text[idx + i];
   __syncthreads();
@@ -35,7 +35,7 @@ __global__ void ACGPUCoalecedMemRead(const int* tr, const char* text, int* occur
 
 // Optimization 1: Shared Memory for GPU bin
 template <int charSetSize, int TILE_SIZE, int BLOCK_SIZE, int GPUbinSize>
-__global__ void ACGPUSharedMem(const int* tr, const char* text, int* occur, const int M, const int L, const int trieNodeNumber) {
+__global__ void ACGPUSharedMem(const int* tr, const unsigned char* text, int* occur, const int M, const int L, const int trieNodeNumber) {
   int idx         = blockIdx.x * blockDim.x * TILE_SIZE;
   int threadStart = idx + threadIdx.x * TILE_SIZE;
   int threadEnd   = threadStart + TILE_SIZE + M - 1;
@@ -59,7 +59,7 @@ __global__ void ACGPUSharedMem(const int* tr, const char* text, int* occur, cons
 
 // Profiling version for Optimization 1
 template <int charSetSize, int TILE_SIZE, int BLOCK_SIZE, int GPUbinSize>
-__global__ void ACGPUSharedMemProfiling(const int* tr, const char* text, int* occur, const int M, const int L, const int trieNodeNumber,
+__global__ void ACGPUSharedMemProfiling(const int* tr, const unsigned char* text, int* occur, const int M, const int L, const int trieNodeNumber,
                                         unsigned long long* branchCnt) {
   int idx         = blockIdx.x * blockDim.x * TILE_SIZE;
   int threadStart = idx + threadIdx.x * TILE_SIZE;
@@ -85,9 +85,9 @@ __global__ void ACGPUSharedMemProfiling(const int* tr, const char* text, int* oc
     atomicAdd(&occur[i], localOccur[i]);
 }
 
-// Optimization 3: Compact Memory; Template specialization for char
+// Optimization 3: Compact Memory; Template specialization for unsigned char
 template <int charSetSize, int TILE_SIZE>
-__global__ void ACGPUCompactMem(const int* tr, const char* text_conpact, int* occur, const int M, const int L) {
+__global__ void ACGPUCompactMem(const int* tr, const unsigned char* text_conpact, int* occur, const int M, const int L) {
   int idx         = blockIdx.x * blockDim.x * TILE_SIZE;
   int threadStart = idx + threadIdx.x * TILE_SIZE;
   int threadEnd   = threadStart + TILE_SIZE + M - 1;

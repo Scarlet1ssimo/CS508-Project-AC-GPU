@@ -1,0 +1,6 @@
+ATC
+GTG
+GTC
+ATG
+CAA
+ATT
