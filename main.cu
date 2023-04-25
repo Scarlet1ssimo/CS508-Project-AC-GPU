@@ -187,12 +187,16 @@ int main() {
       "dataset/cuda_pattern_matching/keywords.txt",
       "dataset/cuda_pattern_matching/small.txt",
   };
-  eval<92>(0, 32, 0, KERNEL_SHARED_MEM, "ACSharedMem", {0, false, &input2s});
-  eval<138>(0, 32, 0, KERNEL_SHARED_MEM, "ACSharedMem", {0, false, &input2m});
-  eval<139>(0, 32, 0, KERNEL_SHARED_MEM, "ACSharedMem", {0, false, &input2l});
-  eval<4>(0, 6, 0, KERNEL_SHARED_MEM, "ACSharedMem", {0, false, &input1});
+  // eval<92>(0, 32, 0, KERNEL_SHARED_MEM, "ACSharedMem", {0, false, &input2s});
+  // eval<138>(0, 32, 0, KERNEL_SHARED_MEM, "ACSharedMem", {0, false, &input2m});
+  // eval<139>(0, 32, 0, KERNEL_SHARED_MEM, "ACSharedMem", {0, false, &input2l});
+  // eval<4>(0, 6, 0, KERNEL_SHARED_MEM, "ACSharedMem", {0, false, &input1});
 
-  // eval<4>(8, 16000, 1e8, KERNEL_SIMPLE, "ACSimple", {23333, false});
+  // eval<2>(30, 256, 1<<27, KERNEL_SIMPLE, "ACSimple", {23333, false});
+  // eval<2>(30, 256, 1<<27, KERNEL_COALESCED_MEM_READ, "ACSimple", {23333, false});
+  eval<2>(30, 256, 1<<27, KERNEL_SHARED_MEM, "ACSimple", {23333, false});
+  eval<2>(30, 256, 1<<27, KERNEL_SHARED_MEM, "ACSimple", {23333, true});
+  // eval<2>(30, 256, 1<<27, KERNEL_COMPACT_MEM, "ACSimple", {23333, false});
   // eval<4>(8, 16000, 1e8, KERNEL_COALESCED_MEM_READ, "ACCoalecedMemRead", {23333, false});
   // eval<4>(8, 16000, 1e8, KERNEL_SHARED_MEM, "ACSharedMem", {23333, false});
   // eval<4>(8, 16000, 1e8, KERNEL_SHARED_MEM, "ACSharedMemWithReordering", {23333, true});

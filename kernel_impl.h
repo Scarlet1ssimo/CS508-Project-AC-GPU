@@ -56,11 +56,32 @@ __global__ void ACGPUSharedMem(const int* tr, const unsigned char* text, int* oc
   for (int i = threadIdx.x; i < GPUbinSize; i += blockDim.x)
     atomicAdd(&occur[i], localOccur[i]);
 }
+// Optimization 1.0: If Everything in Shared Memory
+template <int charSetSize, int TILE_SIZE, int BLOCK_SIZE, int GPUbinSize>
+__global__ void ACGPUSharedMemBranchFree(const int* tr, const unsigned char* text, int* occur, const int M, const int L,
+                                         const int trieNodeNumber) {
+  int idx         = blockIdx.x * blockDim.x * TILE_SIZE;
+  int threadStart = idx + threadIdx.x * TILE_SIZE;
+  int threadEnd   = threadStart + TILE_SIZE + M - 1;
+
+  extern __shared__ int localOccur[];
+  for (int i = threadIdx.x; i < trieNodeNumber; i += blockDim.x)
+    localOccur[i] = 0;
+  __syncthreads();
+  int state = 0;
+  for (int i = threadStart; i < threadEnd && i < L; i++) {
+    state = tr[state * charSetSize + text[i]];
+    atomicAdd(&localOccur[state], 1);
+  }
+  __syncthreads();
+  for (int i = threadIdx.x; i < trieNodeNumber; i += blockDim.x)
+    atomicAdd(&occur[i], localOccur[i]);
+}
 
 // Profiling version for Optimization 1
 template <int charSetSize, int TILE_SIZE, int BLOCK_SIZE, int GPUbinSize>
-__global__ void ACGPUSharedMemProfiling(const int* tr, const unsigned char* text, int* occur, const int M, const int L, const int trieNodeNumber,
-                                        unsigned long long* branchCnt) {
+__global__ void ACGPUSharedMemProfiling(const int* tr, const unsigned char* text, int* occur, const int M, const int L,
+                                        const int trieNodeNumber, unsigned long long* branchCnt) {
   int idx         = blockIdx.x * blockDim.x * TILE_SIZE;
   int threadStart = idx + threadIdx.x * TILE_SIZE;
   int threadEnd   = threadStart + TILE_SIZE + M - 1;
@@ -150,6 +171,64 @@ __global__ void ACGPUCompactMem(const int* tr, const int2x4_t* text_conpact, int
     }
     if ((M - 1) % 4 >= 3) {
       state = tr[state * charSetSize + text_conpact[threadEnd].q2];
+      atomicAdd(&occur[state], 1);
+    }
+  }
+}
+
+// Optimization 3: Compact Memory; Template specialization for 1bit (charSetSize = 2)
+template <int charSetSize, int TILE_SIZE>
+__global__ void ACGPUCompactMem(const int* tr, const int1x8_t* text_conpact, int* occur, const int M, const int L) {
+  int idx         = blockIdx.x * blockDim.x + threadIdx.x;
+  int threadStart = idx * TILE_SIZE;
+  int threadEnd   = threadStart + TILE_SIZE + (M - 1) / 8;
+
+  int state = 0;
+  for (int i = threadStart; i < threadEnd && i < L / 8; i++) {
+    state = tr[state * charSetSize + text_conpact[i].o0];
+    atomicAdd(&occur[state], 1);
+    state = tr[state * charSetSize + text_conpact[i].o1];
+    atomicAdd(&occur[state], 1);
+    state = tr[state * charSetSize + text_conpact[i].o2];
+    atomicAdd(&occur[state], 1);
+    state = tr[state * charSetSize + text_conpact[i].o3];
+    atomicAdd(&occur[state], 1);
+    state = tr[state * charSetSize + text_conpact[i].o4];
+    atomicAdd(&occur[state], 1);
+    state = tr[state * charSetSize + text_conpact[i].o5];
+    atomicAdd(&occur[state], 1);
+    state = tr[state * charSetSize + text_conpact[i].o6];
+    atomicAdd(&occur[state], 1);
+    state = tr[state * charSetSize + text_conpact[i].o7];
+    atomicAdd(&occur[state], 1);
+  }
+  if (threadEnd < L / 8) { // If the last thread is not enough to process the last 8 characters
+    if ((M - 1) % 8 >= 1) {
+      state = tr[state * charSetSize + text_conpact[threadEnd].o0];
+      atomicAdd(&occur[state], 1);
+    }
+    if ((M - 1) % 8 >= 2) {
+      state = tr[state * charSetSize + text_conpact[threadEnd].o1];
+      atomicAdd(&occur[state], 1);
+    }
+    if ((M - 1) % 8 >= 3) {
+      state = tr[state * charSetSize + text_conpact[threadEnd].o2];
+      atomicAdd(&occur[state], 1);
+    }
+    if ((M - 1) % 8 >= 4) {
+      state = tr[state * charSetSize + text_conpact[threadEnd].o3];
+      atomicAdd(&occur[state], 1);
+    }
+    if ((M - 1) % 8 >= 5) {
+      state = tr[state * charSetSize + text_conpact[threadEnd].o4];
+      atomicAdd(&occur[state], 1);
+    }
+    if ((M - 1) % 8 >= 6) {
+      state = tr[state * charSetSize + text_conpact[threadEnd].o5];
+      atomicAdd(&occur[state], 1);
+    }
+    if ((M - 1) % 8 >= 7) {
+      state = tr[state * charSetSize + text_conpact[threadEnd].o6];
       atomicAdd(&occur[state], 1);
     }
   }
