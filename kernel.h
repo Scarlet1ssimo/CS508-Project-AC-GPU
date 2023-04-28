@@ -16,7 +16,7 @@ template <int charSetSize>
 void ACGPUSharedMemLaunch(const int* tr, const unsigned char* text, int* occur, const int M, const int L, const int trieNodeNumber) {
   const int TILE_SIZE  = 32;
   const int BLOCK_SIZE = 512;
-  const int GPUbinSize = 1024;
+  const int GPUbinSize = 2048;
   int blockNum         = (L - 1) / (BLOCK_SIZE * TILE_SIZE) + 1;
 #ifndef PROFILING
   ACGPUSharedMem<charSetSize, TILE_SIZE, BLOCK_SIZE, GPUbinSize><<<blockNum, BLOCK_SIZE>>>(tr, text, occur, M, L, trieNodeNumber);

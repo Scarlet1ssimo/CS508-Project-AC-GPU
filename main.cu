@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <ctime>
 #include <map>
+#include <vector>
 using std::map;
 
 #define CUDA_RUNTIME(stmt) checkCuda(stmt, __FILE__, __LINE__);
@@ -187,14 +188,20 @@ int main() {
       "dataset/cuda_pattern_matching/keywords.txt",
       "dataset/cuda_pattern_matching/small.txt",
   };
-  eval<92>(0, 32, 0, KERNEL_SHARED_MEM, "ACSharedMem", {0, false, &input2s});
-  eval<138>(0, 32, 0, KERNEL_SHARED_MEM, "ACSharedMem", {0, false, &input2m});
-  eval<139>(0, 32, 0, KERNEL_SHARED_MEM, "ACSharedMem", {0, false, &input2l});
-  eval<4>(0, 6, 0, KERNEL_SHARED_MEM, "ACSharedMem", {0, false, &input1});
 
-  // eval<4>(8, 16000, 1e8, KERNEL_SIMPLE, "ACSimple", {23333, false});
-  // eval<4>(8, 16000, 1e8, KERNEL_COALESCED_MEM_READ, "ACCoalecedMemRead", {23333, false});
-  // eval<4>(8, 16000, 1e8, KERNEL_SHARED_MEM, "ACSharedMem", {23333, false});
-  // eval<4>(8, 16000, 1e8, KERNEL_SHARED_MEM, "ACSharedMemWithReordering", {23333, true});
-  // eval<4>(8, 16000, 1e8, KERNEL_COMPACT_MEM, "ACCompactMem", {23333, false});
+  const int C = 2, L = 1 << 27;
+
+  std::vector<int> Ns = {4,16,64,256};
+  std::vector<int> Ms = {10, 20, 30};
+
+  for (int N : Ns) {
+    for (int M : Ms) {
+      printf("# Patterns = %d, Pattern Length = %d\n", N, M);
+      eval<C>(M, N, L, KERNEL_SIMPLE, "ACSimple", {23333, false});
+      eval<C>(M, N, L, KERNEL_COALESCED_MEM_READ, "ACCoalecedMemRead", {23333, false});
+      eval<C>(M, N, L, KERNEL_SHARED_MEM, "ACSharedMem", {23333, false});
+      eval<C>(M, N, L, KERNEL_SHARED_MEM, "ACSharedMemWithReordering", {23333, true});
+      eval<C>(M, N, L, KERNEL_COMPACT_MEM, "ACCompactMem", {23333, true});
+    }
+  }
 }
