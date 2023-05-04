@@ -98,6 +98,13 @@ For charSet that doesn't occupy full 8bit-char space, we try to compress the tex
 
 ~6.5 ms on RAI for int2x4_t.
 
+## Optimization 4
+
+| Kernel | $N=1000$ (ms)|$4000$|$8000$|$12000$|$16000$|
+|-|-|-|-|-|-|
+|Opt4|8.370144 |28.311457 |32.346111 |30.624767| OOM|
+|Opt1.1|19.271681| 39.282688| 51.364864| 51.356670| 48.454655|
+
 ## Benchmark
 
 https://github.com/kaushiksk/boyer-moore-aho-corasick-in-cuda
@@ -109,3 +116,4 @@ https://github.com/Abhi9k/AhoCorasickParallel
 | Abhi9k                     | medium    | `L=15362775, N=32, M=4, charSetSize=138` | 1.774ms    | 0.258112 ms `ACSharedMem` |
 | Abhi9k                     | large     | `L=30467185, N=32, M=4, charSetSize=139` | 16.910ms   | 0.419840 ms `ACSharedMem` |
 | kaushiksk `ac-bits-shared` | default   | `L=12582912, N=6, M=3, charSetSize=4`    | 1.610688ms | 0.208928 ms `ACSharedMem` |
+
