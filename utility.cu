@@ -1,7 +1,9 @@
 #include "utility.h"
 #include <cassert>
 #include <fstream>
+#include <string>
 using std::ifstream;
+using std::ofstream;
 using std::string;
 bool parseDataFrom(int& M, const int N, int& L, int charSetSize, unsigned char*** patterns, unsigned char** text, const CustomInput& CI) {
   ifstream TF(CI.textFile, std::ios::binary);
@@ -65,4 +67,21 @@ void randomData(int M, int N, int L, int charSetSize, unsigned char*** patterns,
   }
   *text = (unsigned char*) malloc((L + 1) * sizeof(unsigned char));
   random_string(*text, charSetSize, L);
+}
+void dumpACGTData(int M, int N, int L, unsigned char** patterns, unsigned char* text) {
+  char map[] = {'A', 'C', 'G', 'T'};
+  ofstream PF("patterns_" + std::to_string(M) + "_" + std::to_string(N) + ".txt");
+  PF << N << " " << M << "\n";
+  for (int i = 0; i < N; i++) {
+    for (int j = 0; j < M; j++)
+      PF << map[patterns[i][j]];
+    PF << "\n";
+  }
+  PF.close();
+  ofstream TF("text_" + std::to_string(M) + "_" + std::to_string(N) + ".txt");
+  TF << L << "\n";
+  for (int i = 0; i < L; i++)
+    TF << map[text[i]];
+  TF << "\n";
+  TF.close();
 }

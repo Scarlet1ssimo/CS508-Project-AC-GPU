@@ -233,3 +233,27 @@ __global__ void ACGPUCompactMem(const int* tr, const int1x8_t* text_conpact, int
     }
   }
 }
+
+// Optimization 4: Only put leaf nodes in shared memory
+template <int charSetSize, int TILE_SIZE, int BLOCK_SIZE>
+__global__ void ACGPUEqLength(const int* tr, const unsigned char* text, int* occur, const int N, const int M, const int L,
+                              const int trieNodeNumber) {
+  int idx         = blockIdx.x * blockDim.x * TILE_SIZE;
+  int threadStart = idx + threadIdx.x * TILE_SIZE;
+  int threadEnd   = threadStart + TILE_SIZE + M - 1;
+  int leafStart   = trieNodeNumber - N;
+
+  extern __shared__ int localOccur[];
+  for (int i = threadIdx.x; i < N; i += blockDim.x)
+    localOccur[i] = 0;
+  __syncthreads();
+  int state = 0;
+  for (int i = threadStart; i < threadEnd && i < L; i++) {
+    state = tr[state * charSetSize + text[i]];
+    if (state >= leafStart)
+      atomicAdd(&localOccur[state - leafStart], 1);
+  }
+  __syncthreads();
+  for (int i = threadIdx.x; i < N; i += blockDim.x)
+    atomicAdd(&occur[i], localOccur[i]);
+}

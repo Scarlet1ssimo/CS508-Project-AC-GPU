@@ -52,6 +52,8 @@ struct AdditionalTestConfig {
   unsigned int randomSeed = 0;
   bool ReorderTrie        = false;
   CustomInput* CI         = nullptr;
+  bool dumpDataOnly       = false;
+  bool skipCPUVerify      = false;
 };
 
 static void random_string(unsigned char* dst, const int charSetSize, const int len) {
@@ -61,3 +63,4 @@ static void random_string(unsigned char* dst, const int charSetSize, const int l
 }
 void randomData(int M, int N, int L, int charSetSize, unsigned char*** patterns, unsigned char** text);
 bool parseDataFrom(int& M, const int N, int& L, int charSetSize, unsigned char*** patterns, unsigned char** text, const CustomInput& CI);
+void dumpACGTData(int M, int N, int L, unsigned char** patterns, unsigned char* text);

@@ -70,3 +70,14 @@ void ACGPUCompactMemLaunch(const int* tr, const unsigned char* text, T* text_com
     ACGPUCompactMem<charSetSize, TILE_SIZE><<<ceil(L * 1.0 / (BLOCK_SIZE * TILE_SIZE * numElement)), BLOCK_SIZE>>>(tr, text, occur, M, L);
   }
 }
+
+template <int charSetSize, typename T>
+void ACGPUEqLengthLaunch(const int* tr, const unsigned char* text, T* text_compact, int* occur, int N, int M, int L, int trieNodeNumber) {
+  const int TILE_SIZE        = 32;
+  const int BLOCK_SIZE       = 512;
+  const int GPUbinSize       = 1024; // could be tuned for control divergence vs shared memory usage
+  const int MaxSharedMemSize = 49152;
+  int blockNum               = (L - 1) / (BLOCK_SIZE * TILE_SIZE) + 1;
+
+  ACGPUEqLength<charSetSize, TILE_SIZE, BLOCK_SIZE><<<blockNum, BLOCK_SIZE, N * sizeof(int)>>>(tr, text, occur, N, M, L, trieNodeNumber);
+}
